@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package fsh;
+
+service FSH {
+	rpc PathIsDir(PathRequest) returns (BoolResponse) {}
+	rpc PathIsLink(PathRequest) returns (BoolResponse) {}
+	rpc PathIsFile(PathRequest) returns (BoolResponse) {}
+	rpc PathExists(PathRequest) returns (BoolResponse) {}
+	rpc Stat(StatRequest) returns (StatResponse) {}
+	rpc Unlink(PathRequest) returns (NoneResponse) {}
+	rpc Utime(UtimeRequest) returns (NoneResponse) {}
+	rpc Listdir(PathRequest) returns (ListdirResponse) {}
+	rpc Mkdir(MkdirRequest) returns (NoneResponse) {}
+	rpc Rmdir(PathRequest) returns (NoneResponse) {}
+
+	rpc Open(OpenRequest) returns (OpenResponse) {}
+	rpc Close(CloseRequest) returns (NoneResponse) {}
+	rpc Read(ReadRequest) returns (ReadResponse) {}
+	rpc Write(WriteRequest) returns (WriteResponse) {}
+	rpc Lseek(LseekRequest) returns (LseekResponse) {}
+	rpc Fsync(FsyncRequest) returns (NoneResponse) {}
+	rpc Truncate(TruncateRequest) returns (NoneResponse) {}
+}
+
+message PathRequest {
+	string path = 1;
+}
+
+message BoolResponse {
+	bool ok = 1;
+	bytes err = 2;
+	bool ret = 3;
+}
+
+message StatRequest {
+	string path = 1;
+	bool follow_symlinks = 2;
+}
+
+message StatResponse {
+	bool ok = 1;
+	bytes err = 2;
+	bytes ret = 3;
+}
+
+message UtimeRequest {
+	string path = 1;
+	bool follow_symlinks = 2;
+	int32 atime = 3;
+	int32 mtime = 4;
+}
+
+message NoneResponse {
+	bool ok = 1;
+	bytes err = 2;
+}
+
+message ListdirResponse {
+	bool ok = 1;
+	bytes err = 2;
+	repeated string ret = 3;
+}
+
+message MkdirRequest {
+	string path = 1;
+	int32 mode = 2;
+}
+
+message OpenRequest {
+	string path = 1;
+	int32 flags = 2;
+	int32 mode = 3;
+}
+
+message OpenResponse {
+	bool ok = 1;
+	bytes err = 2;
+	int32 ret = 3;
+}
+
+message CloseRequest {
+	int32 fd = 1;
+}
+
+message ReadRequest {
+	int32 fd = 1;
+	int32 n = 2;
+}
+
+message ReadResponse {
+	bool ok = 1;
+	bytes err = 2;
+	bytes ret = 3;
+}
+
+message WriteRequest {
+	int32 fd = 1;
+	bytes str = 2;
+}
+
+message WriteResponse {
+	bool ok = 1;
+	bytes err = 2;
+	int32 ret = 3;
+}
+
+message LseekRequest {
+	int32 fd = 1;
+	int32 pos = 2;
+	int32 whence = 3;
+}
+
+message LseekResponse {
+	bool ok = 1;
+	bytes err = 2;
+	int32 ret = 3;
+}
+
+message FsyncRequest {
+	int32 fd = 1;
+}
+
+message TruncateRequest {
+	int32 fd = 1;
+	int32 length = 2;
+}
