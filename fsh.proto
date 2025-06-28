@@ -36,6 +36,8 @@ message BoolResponse {
 message StatRequest {
 	string path = 1;
 	bool follow_symlinks = 2;
+	bool use_fd = 3;
+	int32 fd = 4;
 }
 
 message StatResponse {

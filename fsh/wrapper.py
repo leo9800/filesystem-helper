@@ -98,8 +98,11 @@ class Syscall(object):
 		if not r.ok:
 			raise pickle.loads(r.err)
 
-	def Stat(self, path: str, follow_symlinks: bool = False) -> os.stat_result:
-		r = self.__stub.Stat(fsh_pb2.StatRequest(path=path, follow_symlinks=follow_symlinks))
+	def stat(self, path: str|int, follow_symlinks: bool = False) -> os.stat_result:
+		if isinstance(path, int):
+			r = self.__stub.Stat(fsh_pb2.StatRequest(path='', fd=path, use_fd=True, follow_symlinks=follow_symlinks))
+		else:
+			r = self.__stub.Stat(fsh_pb2.StatRequest(path=path, fd=-1, use_fd=False, follow_symlinks=follow_symlinks))
 		if not r.ok:
 			raise pickle.loads(r.err)
 		return pickle.loads(r.ret)

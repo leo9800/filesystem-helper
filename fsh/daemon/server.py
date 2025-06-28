@@ -19,7 +19,10 @@ class FSH(fsh_pb2_grpc.FSHServicer):
 
 	def Stat(self, request: fsh_pb2.StatRequest, context) -> fsh_pb2.StatResponse:
 		try:
-			stat = os.stat(request.path, follow_symlinks=request.follow_symlinks)
+			if request.use_fd:
+				stat = os.stat(request.fd, follow_symlinks=request.follow_symlinks)
+			else:
+				stat = os.stat(request.path, follow_symlinks=request.follow_symlinks)
 		except Exception as e:
 			return fsh_pb2.StatResponse(ok=False, err=pickle.dumps(e), ret=b'')
 		else:
