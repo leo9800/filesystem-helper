@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+dynamic = ["version"]
+name = "filesystem-helper"
+description ="gRPC-based helper to invoke python filesystem-related functions/syscalls as another user."
+readme = "README.md"
+license = "MIT"
+authors = [{name = "Leo", email="i@hardrain980.com"}]
+maintainers = [{name = "Leo", email="i@hardrain980.com"}]
+keywords = ["grpc", "protobuf", "filesystem", "syscall", "helper", "setuid"]
+classifiers = [
+	"Development Status :: 3 - Alpha",
+	"Environment :: No Input/Output (Daemon)",
+	"Operating System :: Unix",
+	"Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.12"
+dependencies = [
+	"grpcio",
+	"protobuf",
+]
+
+[project.optional-dependencies]
+dev = [
+	"grpcio-tools",
+	"pytest",
+]
+
+[project.urls]
+Homepage = "https://github.com/leo9800/filesystem-helper"
+Repository = "https://github.com/leo9800/filesystem-helper.git"
+Issues = "https://github.com/leo9800/filesystem-helper/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "fsh.__version__"}
