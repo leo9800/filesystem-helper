@@ -1,6 +1,5 @@
 from io import DEFAULT_BUFFER_SIZE, SEEK_CUR, SEEK_END, SEEK_SET, RawIOBase, UnsupportedOperation
-import fsh_pb2
-import fsh_pb2_grpc
+from fsh import fsh_pb2, fsh_pb2_grpc
 import errno
 import os
 import pickle

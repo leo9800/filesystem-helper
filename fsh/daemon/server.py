@@ -1,5 +1,4 @@
-import fsh_pb2
-import fsh_pb2_grpc
+from fsh import fsh_pb2, fsh_pb2_grpc
 import os
 import pickle
 
