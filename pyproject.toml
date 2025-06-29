@@ -37,3 +37,7 @@ Issues = "https://github.com/leo9800/filesystem-helper/issues"
 
 [tool.setuptools.dynamic]
 version = {attr = "fsh.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["fsh"]
+namespaces = false
