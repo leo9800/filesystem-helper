@@ -27,6 +27,7 @@ dependencies = [
 dev = [
 	"grpcio-tools",
 	"pytest",
+	"pytest-cov",
 ]
 
 [project.urls]
