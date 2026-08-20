@@ -79,7 +79,7 @@ class TestIOObject(FSHTestBase):
 
 	def test_readall_large(self):
 		with open(f'{self.PATH}/largefile', 'wb') as f:
-			for _ in range(0, 8388608): f.write(b'\x00\x10\x20\x30\x40\x50\x60\x70\x80\x90\xA0\xB0\xC0\xD0\xE0\xF0')
+			f.write(os.urandom(134217728))
 			f.flush()
 		with grpc.insecure_channel(f'127.0.0.1:{self.PORT}') as c, Open(c, f'{self.PATH}/largefile', 'r+') as f:
 			assert len(f.readall()) == 134217728

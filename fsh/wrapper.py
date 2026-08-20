@@ -42,10 +42,22 @@ class Syscall(object):
 			raise pickle.loads(r.err)
 
 	def read(self, fd: int, n: int) -> bytes:
-		r = self.__stub.Read(fsh_pb2.ReadRequest(fd=fd, n=n))
-		if not r.ok:
-			raise pickle.loads(r.err)
-		return r.ret
+		read_status = False
+		s = self.__stub.Read(fsh_pb2.ReadRequest(fd=fd, n=n))
+		c = b''
+
+		for m in s:
+			if read_status is True:
+				assert m.HasField('data'), 'invalid response: no data field'
+				c += m.data
+				continue
+
+			assert m.HasField('status')
+			read_status = True
+			if not m.status.ok:
+				raise pickle.loads(m.status.err)
+
+		return c
 
 	def write(self, fd: int, i: bytes) -> int:
 		r = self.__stub.Write(fsh_pb2.WriteRequest(fd=fd, str=i))

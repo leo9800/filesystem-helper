@@ -4,6 +4,8 @@ import pickle
 
 
 class FSH(fsh_pb2_grpc.FSHServicer):
+	BLKSIZE = 20 << 20
+
 	def PathIsDir(self, request: fsh_pb2.PathRequest, context) -> fsh_pb2.BoolResponse:
 		return fsh_pb2.BoolResponse(ok=True, err=b'', ret=os.path.isdir(request.path))
 
@@ -87,13 +89,25 @@ class FSH(fsh_pb2_grpc.FSHServicer):
 		else:
 			return fsh_pb2.NoneResponse(ok=True, err=b'')
 
-	def Read(self, request: fsh_pb2.ReadRequest, context) -> fsh_pb2.ReadResponse:
+	def Read(self, request: fsh_pb2.ReadRequest, context):
 		try:
-			c = os.read(request.fd, request.n)
+			status_sent = False
+			read_size = 0
+			while (read_size <= request.n):
+				r = request.n - read_size
+				c = os.read(request.fd, r if r < self.BLKSIZE else self.BLKSIZE)
+				if c == b'':
+					break
+				read_size += len(c)
+				if not status_sent:
+					yield fsh_pb2.ReadResponse(status=fsh_pb2.ReadStatusResponse(ok=True, err=b''))
+					status_sent = True
+				yield fsh_pb2.ReadResponse(data=c)
 		except Exception as e:
-			return fsh_pb2.ReadResponse(ok=False, err=pickle.dumps(e), ret=b'')
-		else:
-			return fsh_pb2.ReadResponse(ok=True, err=b'', ret=c)
+			yield fsh_pb2.ReadResponse(status=fsh_pb2.ReadStatusResponse(
+				ok=False,
+				err=pickle.dumps(e),
+			))
 
 	def Write(self, request: fsh_pb2.WriteRequest, context) -> fsh_pb2.WriteResponse:
 		try:
