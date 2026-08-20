@@ -6,6 +6,6 @@
 	PYTHONPATH=fsh/:tests/ pytest \
 		--cov-report html:coverage/ \
 		--cov=fsh.wrapper \
-		--cov=fsh.daemon.server \
+		--cov=fsh.server \
 		./tests/
 }

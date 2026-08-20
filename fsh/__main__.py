@@ -1,5 +1,5 @@
 from concurrent import futures
-from fsh.daemon.server import FSH
+from fsh.server import FSH
 from fsh import fsh_pb2_grpc
 import os
 import grpc

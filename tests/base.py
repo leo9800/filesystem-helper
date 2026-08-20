@@ -2,7 +2,7 @@ import os
 import shutil
 import grpc
 from fsh import fsh_pb2_grpc
-from fsh.daemon.server import FSH
+from fsh.server import FSH
 from concurrent import futures
 
 
