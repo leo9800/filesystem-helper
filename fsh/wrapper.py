@@ -216,22 +216,11 @@ class ByteFileIO(RawIOBase):
 	def readall(self):
 		self._checkClosed()
 		self._checkReadable()
-		if self._stat_atopen is None or self._stat_atopen.st_size <= 0:
-			bufsize = DEFAULT_BUFFER_SIZE
-		else:
-			bufsize = self._stat_atopen.st_size + 1
-			if self._stat_atopen.st_size > 65536:
-				try:
-					pos = Syscall(self._channel).lseek(self._fd, 0, SEEK_CUR)
-					if self._stat_atopen.st_size >= pos:
-						bufsize = self._stat_atopen.st_size - pos + 1
-				except OSError:
-					pass
 
 		results = b''
 
 		while True:
-			r = self.read(bufsize)
+			r = self.read(2 << 20)
 			if not r:
 				break
 			results += r
