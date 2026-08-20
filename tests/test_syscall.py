@@ -1,5 +1,4 @@
 import os
-from _pytest.capture import SysCapture
 import grpc
 import pytest
 from fsh.wrapper import Syscall
