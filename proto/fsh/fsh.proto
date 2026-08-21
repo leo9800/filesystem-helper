@@ -17,7 +17,7 @@ service FSH {
 	rpc Open(OpenRequest) returns (OpenResponse) {}
 	rpc Close(CloseRequest) returns (NoneResponse) {}
 	rpc Read(ReadRequest) returns (stream ReadResponse) {}
-	rpc Write(WriteRequest) returns (WriteResponse) {}
+	rpc Write(stream WriteRequest) returns (WriteResponse) {}
 	rpc Lseek(LseekRequest) returns (LseekResponse) {}
 	rpc Fsync(FsyncRequest) returns (NoneResponse) {}
 	rpc Truncate(TruncateRequest) returns (NoneResponse) {}
@@ -103,8 +103,10 @@ message ReadStatusResponse {
 }
 
 message WriteRequest {
-	int32 fd = 1;
-	bytes str = 2;
+	oneof payload {
+		int32 fd = 1;
+		bytes data = 2;
+	}
 }
 
 message WriteResponse {

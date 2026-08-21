@@ -26,6 +26,7 @@ class Path(object):
 
 
 class Syscall(object):
+	BUFSIZE = 2 << 20
 	def __init__(self, channel) -> None:
 		self.__channel = channel
 		self.__stub = fsh_pb2_grpc.FSHStub(self.__channel)
@@ -60,7 +61,11 @@ class Syscall(object):
 		return c
 
 	def write(self, fd: int, i: bytes) -> int:
-		r = self.__stub.Write(fsh_pb2.WriteRequest(fd=fd, str=i))
+		def iterx(fd: int, i: bytes):
+			yield fsh_pb2.WriteRequest(fd=fd)
+			for x in range(0, len(i), self.BUFSIZE):
+				yield fsh_pb2.WriteRequest(data=i[x: x + self.BUFSIZE])
+		r = self.__stub.Write(iterx(fd, i))
 		if not r.ok:
 			raise pickle.loads(r.err)
 		return r.ret

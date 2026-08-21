@@ -109,13 +109,20 @@ class FSH(fsh_pb2_grpc.FSHServicer):
 				err=pickle.dumps(e),
 			))
 
-	def Write(self, request: fsh_pb2.WriteRequest, context) -> fsh_pb2.WriteResponse:
+	def Write(self, request_iterator, context) -> fsh_pb2.WriteResponse:
+		fd = None
+		n = 0
 		try:
-			n = os.write(request.fd, request.str)
+			for m in request_iterator:
+				if fd is not None:
+					assert m.HasField('data')
+					n += os.write(fd, m.data)
+					continue
+				assert m.HasField('fd')
+				fd = m.fd
+			return fsh_pb2.WriteResponse(ok=True, err=b'', ret=n)
 		except Exception as e:
 			return fsh_pb2.WriteResponse(ok=False, err=pickle.dumps(e), ret=-1)
-		else:
-			return fsh_pb2.WriteResponse(ok=True, err=b'', ret=n)
 
 	def Lseek(self, request: fsh_pb2.LseekRequest, context) -> fsh_pb2.LseekResponse:
 		try:
