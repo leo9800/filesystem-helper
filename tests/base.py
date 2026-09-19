@@ -1,27 +1,25 @@
+import asyncio
+import contextlib
 import os
+import pytest_asyncio
 import shutil
-import grpc
-from fsh import fsh_pb2_grpc
-from fsh.server import FSH
-from concurrent import futures
+
+from fsh.__main__ import serve
 
 
 class FSHTestBase(object):
-	PORT = 50001
+	PREFIX = '/tmp/pytest_fsh'
 	PATH = '/tmp/fsh_tests'
 
-	def setup_method(self, test_method):
-		self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
-		fsh_pb2_grpc.add_FSHServicer_to_server(FSH(), self.server)
-		self.server.add_insecure_port(f'127.0.0.1:{self.PORT}')
-		self.server.start()
-
+	@pytest_asyncio.fixture(autouse=True)
+	async def setup(self):
 		os.mkdir(self.PATH)
 		os.mkdir(f'{self.PATH}/directory')
 		with open(f'{self.PATH}/file', 'wb') as f:
 			f.write(b'fsh-test-123\n')
 		os.symlink(f'{self.PATH}/file', f'{self.PATH}/link')
-
-	def teardown_method(self, test_method):
-		self.server.stop(None)
+		self.server_task = asyncio.create_task(serve(self.PREFIX))
+		yield
+		with contextlib.suppress(asyncio.CancelledError):
+			self.server_task.cancel()
 		shutil.rmtree(self.PATH)

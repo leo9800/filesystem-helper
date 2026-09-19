@@ -1,10 +1,19 @@
-from fsh import fsh_pb2, fsh_pb2_grpc
+import array
+import asyncio
 import os
 import pickle
+import secrets
+import socket
+import threading
+from typing import Dict, Optional
+
+from fsh import fsh_pb2, fsh_pb2_grpc, EXCHANGE_FAIL, EXCHANGE_SUCCESS, TOKEN_SIZE
 
 
 class FSH(fsh_pb2_grpc.FSHServicer):
-	BLKSIZE = 20 << 20
+	def __init__(self) -> None:
+		self._fd_map: Dict[bytes, int] = {}
+		self._fd_lock = threading.Lock()
 
 	def PathIsDir(self, request: fsh_pb2.PathRequest, context) -> fsh_pb2.BoolResponse:
 		return fsh_pb2.BoolResponse(ok=True, err=b'', ret=os.path.isdir(request.path))
@@ -20,10 +29,7 @@ class FSH(fsh_pb2_grpc.FSHServicer):
 
 	def Stat(self, request: fsh_pb2.StatRequest, context) -> fsh_pb2.StatResponse:
 		try:
-			if request.use_fd:
-				stat = os.stat(request.fd)
-			else:
-				stat = os.stat(request.path, follow_symlinks=request.follow_symlinks)
+			stat = os.stat(request.path, follow_symlinks=request.follow_symlinks)
 		except Exception as e:
 			return fsh_pb2.StatResponse(ok=False, err=pickle.dumps(e), ret=b'')
 		else:
@@ -77,73 +83,48 @@ class FSH(fsh_pb2_grpc.FSHServicer):
 		try:
 			fd = os.open(request.path, flags=request.flags, mode=request.mode)
 		except Exception as e:
-			return fsh_pb2.OpenResponse(ok=False, err=pickle.dumps(e), ret=-1)
-		else:
-			return fsh_pb2.OpenResponse(ok=True, err=b'', ret=fd)
-
-	def Close(self, request: fsh_pb2.CloseRequest, context) -> fsh_pb2.NoneResponse:
+			return fsh_pb2.OpenResponse(ok=False, err=pickle.dumps(e), token=b'')
 		try:
-			os.close(request.fd)
+			token = secrets.token_bytes(TOKEN_SIZE)
+			with self._fd_lock:
+				while token in self._fd_map: token = secrets.token_bytes(TOKEN_SIZE)
+			self._fd_map[token] = fd
 		except Exception as e:
-			return fsh_pb2.NoneResponse(ok=False, err=pickle.dumps(e))
-		else:
-			return fsh_pb2.NoneResponse(ok=True, err=b'')
+			os.close(fd)
+			raise  # this should not fail, if so, raise to upper level
+		return fsh_pb2.OpenResponse(ok=True, err=b'', token=token)
 
-	def Read(self, request: fsh_pb2.ReadRequest, context):
-		try:
-			status_sent = False
-			read_size = 0
-			while (read_size <= request.n):
-				r = request.n - read_size
-				c = os.read(request.fd, r if r < self.BLKSIZE else self.BLKSIZE)
-				if c == b'':
-					break
-				read_size += len(c)
-				if not status_sent:
-					yield fsh_pb2.ReadResponse(status=fsh_pb2.ReadStatusResponse(ok=True, err=b''))
-					status_sent = True
-				yield fsh_pb2.ReadResponse(data=c)
-		except Exception as e:
-			yield fsh_pb2.ReadResponse(status=fsh_pb2.ReadStatusResponse(
-				ok=False,
-				err=pickle.dumps(e),
-			))
+	def exchange_fd(self, token: bytes) -> Optional[int]:
+		with self._fd_lock:
+			return self._fd_map.pop(token, None)
 
-	def Write(self, request_iterator, context) -> fsh_pb2.WriteResponse:
-		fd = None
-		n = 0
-		try:
-			for m in request_iterator:
-				if fd is not None:
-					assert m.HasField('data')
-					n += os.write(fd, m.data)
-					continue
-				assert m.HasField('fd')
-				fd = m.fd
-			return fsh_pb2.WriteResponse(ok=True, err=b'', ret=n)
-		except Exception as e:
-			return fsh_pb2.WriteResponse(ok=False, err=pickle.dumps(e), ret=-1)
 
-	def Lseek(self, request: fsh_pb2.LseekRequest, context) -> fsh_pb2.LseekResponse:
-		try:
-			n = os.lseek(request.fd, request.pos, request.whence)
-		except Exception as e:
-			return fsh_pb2.LseekResponse(ok=False, err=pickle.dumps(e), ret=-1)
-		else:
-			return fsh_pb2.LseekResponse(ok=True, err=b'', ret=n)
+async def fd_socket_listen(s: socket.socket, fsh: FSH):
+	loop = asyncio.get_running_loop()
+	while True:
+		cs, _ = await loop.sock_accept(s)
+		asyncio.create_task(fd_socket_accept(cs, fsh))
 
-	def Fsync(self, request: fsh_pb2.FsyncRequest, context) -> fsh_pb2.NoneResponse:
-		try:
-			os.fsync(request.fd)
-		except Exception as e:
-			return fsh_pb2.NoneResponse(ok=False, err=pickle.dumps(e))
-		else:
-			return fsh_pb2.NoneResponse(ok=True, err=b'')
 
-	def Truncate(self, request: fsh_pb2.TruncateRequest, context) -> fsh_pb2.NoneResponse:
-		try:
-			os.truncate(request.fd, request.length)
-		except Exception as e:
-			return fsh_pb2.NoneResponse(ok=False, err=pickle.dumps(e))
-		else:
-			return fsh_pb2.NoneResponse(ok=True, err=b'')
+async def fd_socket_accept(cs: socket.socket, fsh: FSH):
+	loop = asyncio.get_running_loop()
+	fd = None
+	try:
+		token = cs.recv(TOKEN_SIZE)
+		if len(token) != TOKEN_SIZE:
+			await loop.sock_sendall(cs, EXCHANGE_FAIL)
+			return
+		fd = fsh.exchange_fd(token)
+		if fd is None:
+			await loop.sock_sendall(cs, EXCHANGE_FAIL)
+			return
+		cs.sendmsg(
+			[EXCHANGE_SUCCESS],
+			[(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array('i', [fd]))],
+		)
+	except Exception:
+		raise
+	finally:
+		if fd is not None:
+			os.close(fd)
+		cs.close()
