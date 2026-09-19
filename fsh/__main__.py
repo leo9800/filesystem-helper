@@ -1,25 +1,51 @@
-from concurrent import futures
-from fsh.server import FSH
-from fsh import fsh_pb2_grpc
-import os
+import asyncio
+import contextlib
 import grpc
+import os
+import socket
+import sys
 
-SERVER_THREADS = 8
+from fsh.server import FSH, fd_socket_listen
+from fsh import fsh_pb2_grpc
 
-def serve():
-	uds = f'/tmp/fsh_{os.geteuid()}_{os.getpid()}.sock'
-	assert not os.path.exists(uds)  # this can barely exist ...
+
+async def serve(prefix: str):
+	uds_grpc = f'{prefix}.sock'
+	uds_fd = f'{prefix}.fd.sock'
+	assert not os.path.exists(uds_grpc)
+	assert not os.path.exists(uds_fd)
+
+	fsh = FSH()
+	fd_sock = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+	fd_sock.setblocking(False)
+	fd_sock.bind(uds_fd)
+	fd_sock.listen()
+	os.chmod(uds_fd, 0o0700)
+
+	grpc_server = grpc.aio.server()
+	fsh_pb2_grpc.add_FSHServicer_to_server(fsh, grpc_server)
+	grpc_server.add_insecure_port(f'unix://{uds_grpc}')
+	await grpc_server.start()
+	os.chmod(uds_grpc, 0o0700)
+
+	fd_listen = asyncio.create_task(fd_socket_listen(fd_sock, fsh))
+
 	try:
-		server = grpc.server(futures.ThreadPoolExecutor(max_workers=SERVER_THREADS))
-		fsh_pb2_grpc.add_FSHServicer_to_server(FSH(), server)
-		server.add_insecure_port(f'unix://{uds}')
-		server.start()
-		os.chmod(uds, 0o0700)
-		server.wait_for_termination()
-	except Exception as e:
-		raise e
+		with contextlib.suppress(asyncio.CancelledError):
+			await grpc_server.wait_for_termination()
+	except KeyboardInterrupt:
+		sys.exit(0)
 	finally:
-		os.unlink(uds)
+		with contextlib.suppress(asyncio.CancelledError):
+			await grpc_server.stop(None)
+		fd_listen.cancel()
+		with contextlib.suppress(asyncio.CancelledError):
+			await fd_listen
+		fd_sock.close()
+		with contextlib.suppress(FileNotFoundError):
+			os.unlink(uds_grpc)
+		with contextlib.suppress(FileNotFoundError):
+			os.unlink(uds_fd)
 
 if __name__ == '__main__':
-	serve()
+	asyncio.run(serve(prefix=f'/tmp/fsh_{os.geteuid()}_{os.getpid()}'))

@@ -1,1 +1,4 @@
 __version__ = "1.0.0"
+EXCHANGE_FAIL = b'\x00'
+EXCHANGE_SUCCESS = b'\x01'
+TOKEN_SIZE = 32
