@@ -234,15 +234,15 @@ class ByteFileIO(RawIOBase):
 		self._checkClosed()
 		self._checkReadable()
 
-		results = b''
+		trunks = []
 
 		while True:
 			r = self.read(2 << 20)
 			if not r:
 				break
-			results += r
+			trunks.append(r)
 
-		return results
+		return b''.join(trunks)
 
 	def write(self, b):
 		self._checkClosed()
